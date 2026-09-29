@@ -169,7 +169,10 @@ class WordBillGenerator:
         date_val = get_val("date", "")
         driver_val = get_val("driver_name", "")
         vehicle_val = get_val("vehicle_number") or get_val("vehicle_no", "")
-        party_val = get_val("customer_name") or get_val("party_name", "") or company_name or ""
+        customer_val = get_val("customer_name") or get_val("party_name", "")
+        recipient_val = customer_val or company_name or ""
+        passenger_val = get_val("passenger_name", "").strip()
+        booked_by_val = get_val("booked_by", "").strip()
         total_km_val = get_val("total_km", "")
         starting_time_val = get_val("starting_time", "")
         closing_time_val = get_val("closing_time", "")
@@ -282,7 +285,7 @@ class WordBillGenerator:
         p_cust = doc.add_paragraph()
         p_cust.paragraph_format.space_before = Pt(0)
         p_cust.paragraph_format.space_after = Pt(10)
-        r_cust = p_cust.add_run(f"{party_val}")
+        r_cust = p_cust.add_run(f"{recipient_val}")
         r_cust.font.name = FONT_PRIMARY
         r_cust.font.size = Pt(11)
         r_cust.font.bold = False
@@ -381,7 +384,14 @@ class WordBillGenerator:
             toll_expr = extract_expr(toll_raw, "Toll") if ("toll" in str(toll_raw).lower() and "=" in str(toll_raw)) else "Toll"
             billing_items.append((toll_expr, toll_amt))
 
-        # 6. Total Amount
+        # 6. Parking (e.g. "Parking = 250" or "250" -> expr "Parking", amt 250.00)
+        parking_raw = get_val("parking", "")
+        parking_amt = parse_amt(parking_raw)
+        if parking_amt is not None and parking_amt > 0:
+            parking_expr = extract_expr(parking_raw, "Parking") if ("parking" in str(parking_raw).lower() and "=" in str(parking_raw)) else "Parking"
+            billing_items.append((parking_expr, parking_amt))
+
+        # 7. Total Amount
         total_amt = parse_amt(total_amt_raw)
         if total_amt is None and billing_items:
             total_amt = sum(item[1] for item in billing_items)
@@ -485,20 +495,27 @@ class WordBillGenerator:
         r_sign_hdr.font.size = Pt(14)
         r_sign_hdr.font.bold = False
 
-        # For recipient line: Imprint MT Shadow, 11pt
+        # For recipient line: Imprint MT Shadow, 11pt (Passenger name when known, never customer_name)
         p_for = doc.add_paragraph()
         p_for.paragraph_format.space_before = Pt(4)
         p_for.paragraph_format.space_after = Pt(16)
-        r_for = p_for.add_run(f"For :{party_val}")
+        for_text = f"For :{passenger_val}" if passenger_val else "For :"
+        r_for = p_for.add_run(for_text)
         r_for.font.name = FONT_TITLE
         r_for.font.size = Pt(11)
         r_for.font.bold = False
 
         # Booked by and Manager sign-off paragraph with tab alignment
+        # Step 9.1: Booked by represents client organization or booking officer, NEVER driver
         p_sign = doc.add_paragraph()
         p_sign.paragraph_format.space_before = Pt(8)
         p_sign.paragraph_format.space_after = Pt(0)
-        booked_text = f"Booked by : {driver_val}" if driver_val else "Booked by :"
+        if booked_by_val:
+            booked_text = f"Booked by : {booked_by_val}"
+        elif company_name:
+            booked_text = f"Booked by : {company_name}"
+        else:
+            booked_text = "Booked by :"
         r_bk = p_sign.add_run(booked_text)
         r_bk.font.name = FONT_TITLE
         r_bk.font.size = Pt(11)
