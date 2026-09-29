@@ -35,10 +35,17 @@ class CompanyService:
                 logger.error("Failed to create company indexes: %s", str(ex))
 
     def _doc_to_response(self, doc: dict) -> CompanyResponse:
+        billing_rates = doc.get("billing_rates")
+        parsed_rates = None
+        if billing_rates and isinstance(billing_rates, list):
+            from app.schemas.company import RateConfig
+            parsed_rates = [RateConfig(**r) if isinstance(r, dict) else r for r in billing_rates]
+
         return CompanyResponse(
             id=str(doc["_id"]),
             name=doc["name"],
             is_active=doc.get("is_active", True),
+            billing_rates=parsed_rates,
             created_at=doc.get("created_at", datetime.now(timezone.utc)),
             updated_at=doc.get("updated_at", datetime.now(timezone.utc))
         )
@@ -48,6 +55,7 @@ class CompanyService:
         doc = {
             "name": data.name,
             "is_active": True,
+            "billing_rates": [r.model_dump() for r in data.billing_rates] if data.billing_rates is not None else None,
             "created_at": now,
             "updated_at": now
         }
@@ -89,6 +97,8 @@ class CompanyService:
             update_fields["name"] = data.name
         if data.is_active is not None:
             update_fields["is_active"] = data.is_active
+        if data.billing_rates is not None:
+            update_fields["billing_rates"] = [r.model_dump() for r in data.billing_rates]
 
         if not update_fields:
             return self.get_by_id(company_id)
