@@ -42,6 +42,10 @@ class DutySlipExtractedFields(BaseModel):
     tour_location: ExtractedField = Field(default_factory=ExtractedField)
     party_name: ExtractedField = Field(default_factory=ExtractedField)
     customer_name: ExtractedField = Field(default_factory=ExtractedField)
+    passenger_name: ExtractedField = Field(default_factory=ExtractedField)    # Separate passenger/guest field
+    booked_by: ExtractedField = Field(default_factory=ExtractedField)         # Client organization or booking person
+    service_type: ExtractedField = Field(default_factory=ExtractedField)      # "local" vs "outstation"
+    vehicle_category: ExtractedField = Field(default_factory=ExtractedField)  # "sedan", "crysta", "innova", etc.
     remarks: ExtractedField = Field(default_factory=ExtractedField)
 
     # Back-side handwritten billing calculation line-items (as document values)
@@ -50,6 +54,7 @@ class DutySlipExtractedFields(BaseModel):
     extra_hour_charge: ExtractedField = Field(default_factory=ExtractedField) # e.g. "1.5 x 150 = 225"
     bata: ExtractedField = Field(default_factory=ExtractedField)              # e.g. "250"
     toll: ExtractedField = Field(default_factory=ExtractedField)              # e.g. "40"
+    parking: ExtractedField = Field(default_factory=ExtractedField)           # e.g. "250" (Optional parking line-item)
     total_amount: ExtractedField = Field(default_factory=ExtractedField)      # e.g. "4020"
 
 
@@ -60,6 +65,7 @@ class CalculatedValidationSummary(BaseModel):
     calculated_extra_hours: Optional[float] = None
     calculated_extra_km_amount: Optional[float] = None
     calculated_extra_hour_amount: Optional[float] = None
+    calculated_parking_amount: Optional[float] = None
     calculated_total_amount: Optional[float] = None
     is_km_consistent: bool = True
     is_time_consistent: bool = True
