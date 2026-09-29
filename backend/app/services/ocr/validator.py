@@ -86,6 +86,10 @@ def normalize_and_validate_extraction(
         "tour_location",
         "party_name",
         "customer_name",
+        "passenger_name",
+        "booked_by",
+        "service_type",
+        "vehicle_category",
         "remarks",
     ]
 
@@ -95,12 +99,13 @@ def normalize_and_validate_extraction(
         "extra_hour_charge",
         "bata",
         "toll",
+        "parking",
         "total_amount",
     ]
 
     all_expected_fields = expected_front_fields + expected_back_fields
 
-    # Sync party_name and customer_name if only one is provided
+    # Sync party_name and customer_name if only one is provided (both represent the customer / recipient)
     if "party_name" in raw_fields and "customer_name" not in raw_fields:
         raw_fields["customer_name"] = raw_fields["party_name"]
     elif "customer_name" in raw_fields and "party_name" not in raw_fields:
@@ -139,6 +144,12 @@ def normalize_and_validate_extraction(
             rev_reason = None
             conf = 1.0
 
+        # Optional fields when absent should not fail review or lower confidence
+        if fname in ["passenger_name", "booked_by", "remarks", "vehicle_category", "service_type", "parking"] and val is None:
+            needs_rev = False
+            rev_reason = None
+            conf = 1.0
+
         # If manually edited by human reviewer and value is provided, clear unreadable/low confidence flags
         if is_edited and val is not None:
             needs_rev = False
@@ -152,9 +163,9 @@ def normalize_and_validate_extraction(
             if "low_confidence" not in review_reasons:
                 review_reasons.append("low_confidence")
 
-        # Check unreadable / missing on required front fields
+        # Check unreadable / missing on required front/back fields
         if val is None:
-            if fname in ["party_name", "customer_name", "remarks"]:
+            if fname in ["party_name", "customer_name", "passenger_name", "booked_by", "remarks", "vehicle_category", "service_type", "parking"]:
                 needs_rev = False
                 rev_reason = None
             elif fname == "duty_slip_no":
@@ -264,6 +275,7 @@ def normalize_and_validate_extraction(
     calc_extra_km_amt = round(calc_extra_km * 15.0, 2) if calc_extra_km is not None else None
     calc_extra_hr_amt = round(calc_extra_hrs * 150.0, 2) if calc_extra_hrs is not None else None
     calc_total_amt = None
+    parking_amt = None
     is_math_consistent = True
 
     if has_back_scan:
@@ -272,10 +284,13 @@ def normalize_and_validate_extraction(
         extra_hr_amt = _extract_number(fields_dict["extra_hour_charge"].value)
         bata_amt = _extract_number(fields_dict["bata"].value)
         toll_amt = _extract_number(fields_dict["toll"].value)
+        parking_amt = _extract_number(fields_dict["parking"].value)
         total_amt = _extract_number(fields_dict["total_amount"].value)
 
         # Check sum if line items are present
         items = [base_amt, extra_km_amt, extra_hr_amt, bata_amt, toll_amt]
+        if parking_amt is not None and parking_amt > 0:
+            items.append(parking_amt)
         if all(x is not None for x in items):
             calc_total_amt = round(sum(items), 2)
             if total_amt is not None and abs(calc_total_amt - total_amt) > 0.01:
@@ -296,6 +311,7 @@ def normalize_and_validate_extraction(
         calculated_extra_hours=calc_extra_hrs,
         calculated_extra_km_amount=calc_extra_km_amt,
         calculated_extra_hour_amount=calc_extra_hr_amt,
+        calculated_parking_amount=parking_amt,
         calculated_total_amount=calc_total_amt,
         is_km_consistent=is_km_consistent,
         is_time_consistent=is_time_consistent,
